@@ -62,3 +62,7 @@ __MACOSX/
 ._*
 .Spotlight-V100
 .Trashes
+
+sources.txt
+.idea
+a2_nipeters.iml
