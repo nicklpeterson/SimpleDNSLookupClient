@@ -12,8 +12,6 @@ public class DNSQueryHandler {
     private static DatagramSocket socket;
     private static boolean verboseTracing = false;
 
-    private static final Random random = new Random();
-
     /**
      * Sets up the socket and set the timeout to 5 seconds
      *
@@ -50,8 +48,91 @@ public class DNSQueryHandler {
      */
     public static DNSServerResponse buildAndSendQuery(byte[] message, InetAddress server,
                                                       DNSNode node) throws IOException {
-        // TODO (PART 1): Implement this
-        return null;
+        addHeader(message);
+        byte[] query = newQueryWithQuestion(message, node);
+
+        byte[] buffer = new byte[65508];
+        DatagramPacket queryPacket = new DatagramPacket(query, query.length, server, DEFAULT_DNS_PORT);
+        DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
+
+        socket = new DatagramSocket();
+        socket.send(queryPacket);
+        socket.receive(responsePacket);
+
+        byte[] responseData = responsePacket.getData();
+        byte[] responseId = new byte[2];
+        responseId[0] = responseData[0];
+        responseId[1] = responseData[1];
+
+        return new DNSServerResponse(ByteBuffer.wrap(responseData), ByteBuffer.wrap(responseId).getShort());
+    }
+
+    private static void addHeader(byte[] message) {
+        final Random random = new Random();
+        final byte[] id = new byte[2];
+        random.nextBytes(id);
+        // Id
+        message[0] = id[0];
+        message[1] = id[1];
+        // flags
+        message[2] = 0x01;
+        message[3] = 0x00;
+        // number of questions
+        message[4] = 0x00;
+        message[5] = 0x01;
+        // number of answer PRs
+        // number of authority PRs
+        // number of additional PRs
+        for (int i = 6; i < 12; i++) {
+            message[i] = 0x00;
+        }
+    }
+
+    private static byte[] newQueryWithQuestion(byte[] message, DNSNode dnsNode) {
+        final byte[] name = dnsNode.getHostName().getBytes();
+        byte initialByte = 0;
+        for (int i = 0; name[i] != 0x2e; i++) {
+            initialByte++;
+        }
+        int msgIndex = 12;
+        message[msgIndex++] = initialByte;
+
+        for (int i = 0; i < name.length; i++) {
+            byte b = name[i];
+            if (b == 0x2e) {
+                int k = i + 1;
+                byte sectionSize = 0;
+                while (k < name.length && name[k] != 0x2e) {
+                    sectionSize++;
+                    k++;
+                }
+                b = sectionSize;
+            }
+            message[msgIndex++] = b;
+        }
+
+        message[msgIndex++] = 0x0;
+        message[msgIndex++] = 0x0;
+        final byte[] type = ByteBuffer.allocate(4).putInt(dnsNode.getType().getCode()).array();
+        message[msgIndex++] = type[3];
+        message[msgIndex++] = 0x0;
+        message[msgIndex] = 0x01;
+        return trimUnusedBytes(message, msgIndex);
+    }
+
+    private static byte[] trimUnusedBytes(byte[] message, int index){
+        final byte[] query = new byte[index + 1];
+
+        int i = 0;
+        for (byte b : message) {
+            if (i <= index) {
+                query[i] = b;
+                i++;
+            } else {
+                break;
+            }
+        }
+        return query;
     }
 
     /**
