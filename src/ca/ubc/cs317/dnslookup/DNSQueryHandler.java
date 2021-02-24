@@ -3,6 +3,9 @@ package ca.ubc.cs317.dnslookup;
 import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
@@ -144,9 +147,104 @@ public class DNSQueryHandler {
      * @return A set of resource records corresponding to the name servers of the response.
      */
     public static Set<ResourceRecord> decodeAndCacheResponse(int transactionID, ByteBuffer responseBuffer,
-                                                             DNSCache cache) {
+                                                             DNSCache cache) throws UnknownHostException {
         // TODO (PART 1): Implement this
-        return null;
+        byte[] response = responseBuffer.array();
+        int additionalRecords = getAdditionalRecords(response);
+        int answerIndex = getAnswerIndex(response);
+        long ttl = getTTL(response, answerIndex);
+
+        // Get Query DNSNode
+        byte bitmask = 0b00111111;
+        byte[] nameLocation = new byte[] {(byte) (bitmask & response[answerIndex]), response[answerIndex + 1]};
+        int nameIndex = ByteBuffer.wrap(nameLocation).getShort();
+        DNSNode dnsNode = getQueryDnsNode(response, nameIndex);
+
+        InetAddress ip;
+        if (dnsNode.getType() == RecordType.A || dnsNode.getType() == RecordType.AAAA) {
+            // Get ip Address
+            int ipIndex = answerIndex + 12;
+            byte[] ipBytes = new byte[4];
+            for (int i = 0; i < 4; i++) {
+                ipBytes[i] = response[ipIndex + i];
+            }
+            ip = InetAddress.getByAddress(ipBytes);
+        } else {
+            ip = InetAddress.getLocalHost();
+            // TODO
+            // Get text response
+        }
+        ResourceRecord resourceRecord = new ResourceRecord(dnsNode.getHostName(), dnsNode.getType(), ttl, ip);
+
+        Set<ResourceRecord> recordSet = new HashSet<>();
+        recordSet.add(resourceRecord);
+        return recordSet;
+    }
+
+    private static int getAdditionalRecords(byte[] response) {
+        byte[] additionalRecords = new byte[2];
+        additionalRecords[0] = response[10];
+        additionalRecords[1] = response[11];
+        return ByteBuffer.wrap(additionalRecords).getShort();
+    }
+
+    private static int getQDCount(byte[] response) {
+        byte[] qdCount = new byte[2];
+        qdCount[0] = response[4];
+        qdCount[1] = response[5];
+        return ByteBuffer.wrap(qdCount).getShort();
+    }
+
+    private static int getAnswerIndex(byte[] response) {
+        int qIndex = 12;
+        for (int i = getQDCount(response); i > 0; i--) {
+            while (!isEndOfQuery(response, qIndex)) {
+                qIndex++;
+            }
+            qIndex += 4;
+        }
+        return qIndex;
+    }
+
+    private static DNSNode getQueryDnsNode(byte[] response, int nameIndex) {
+        byte[] nameBytes = new byte[512];
+        int sectionSize = response[nameIndex];
+        int nameByteIndex = 0;
+        int responseIndex = nameIndex + 1;
+        while(sectionSize > 0) {
+            for (int i = 0; i < sectionSize; i++) {
+                nameBytes[nameByteIndex++] = response[responseIndex++];
+            }
+            nameBytes[nameByteIndex++] = 0x2e;
+            sectionSize = response[responseIndex++];
+        }
+        String queryString = new String(nameBytes, StandardCharsets.UTF_8);
+
+        byte[] typeBytes = new byte[] { response[responseIndex++], response[responseIndex] };
+        int type = ByteBuffer.wrap(typeBytes).getShort();
+        return new DNSNode(queryString, RecordType.getByCode(type));
+    }
+
+    private static long getTTL(byte[] response, int answerIndex) {
+        byte[] ttlBytes = new byte[4];
+        for (int i = answerIndex + 6, k = 0; i < answerIndex + 10; i++, k++) {
+            ttlBytes[k] = response[i];
+        }
+        return ByteBuffer.wrap(ttlBytes).getInt();
+    }
+
+    private static boolean isEndOfQuery(byte[] response, int index) {
+        return isValidType(response, index) && isValidClass(response, index + 2);
+    }
+
+    private static boolean isValidType(byte[] response, int index) {
+        byte first = response[index];
+        byte second = response[index + 1];
+        return first == 0 && (second == 1 || second == 5 || second == 6 || second == 15 || second == 28);
+    }
+
+    private static boolean isValidClass(byte[] response, int index) {
+        return response[index] == 0 && response[index + 1] == 1;
     }
 
     /**
