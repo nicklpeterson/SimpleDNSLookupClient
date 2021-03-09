@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Date;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
@@ -51,6 +51,8 @@ public class DNSQueryHandler {
      */
     public static DNSServerResponse buildAndSendQuery(byte[] message, InetAddress server,
                                                       DNSNode node) throws IOException {
+        //TODO: add verbose logging
+        // TODO: add timeout if no response received. Retry the request 10 times.
         addHeader(message);
         byte[] query = newQueryWithQuestion(message, node);
 
@@ -150,42 +152,86 @@ public class DNSQueryHandler {
                                                              DNSCache cache) throws UnknownHostException {
         // TODO (PART 1): Implement this
         byte[] response = responseBuffer.array();
-        int additionalRecords = getAdditionalRecords(response);
+        int numberOfRecords = getNumberOfRecords(response);
         int answerIndex = getAnswerIndex(response);
-        long ttl = getTTL(response, answerIndex);
 
         // Get Query DNSNode
-        byte bitmask = 0b00111111;
-        byte[] nameLocation = new byte[] {(byte) (bitmask & response[answerIndex]), response[answerIndex + 1]};
-        int nameIndex = ByteBuffer.wrap(nameLocation).getShort();
-        DNSNode dnsNode = getQueryDnsNode(response, nameIndex);
-
-        InetAddress ip;
-        if (dnsNode.getType() == RecordType.A || dnsNode.getType() == RecordType.AAAA) {
-            // Get ip Address
-            int ipIndex = answerIndex + 12;
-            byte[] ipBytes = new byte[4];
-            for (int i = 0; i < 4; i++) {
-                ipBytes[i] = response[ipIndex + i];
-            }
-            ip = InetAddress.getByAddress(ipBytes);
-        } else {
-            ip = InetAddress.getLocalHost();
-            // TODO
-            // Get text response
-        }
-        ResourceRecord resourceRecord = new ResourceRecord(dnsNode.getHostName(), dnsNode.getType(), ttl, ip);
-
+        // DNSNode dnsNode = getQueryDnsNode(response, nameIndex);
         Set<ResourceRecord> recordSet = new HashSet<>();
-        recordSet.add(resourceRecord);
+        for (int i = 0; i < numberOfRecords; i++) {
+
+            String hostName = getHostName(response, answerIndex);
+            RecordType recordType = getResponseType(response, answerIndex);
+            long ttl = getTTL(response, answerIndex);
+            int dataLength = getDataLength(response, answerIndex);
+
+            // If record type is other skip the record. TODO: Make sure that is correct
+            ResourceRecord resourceRecord;
+            if (recordType == RecordType.CNAME || recordType == RecordType.NS || recordType == RecordType.SOA) {
+                String cname = parseName(response, answerIndex + 12);
+                resourceRecord = new ResourceRecord(hostName, recordType, ttl, cname);
+                cache.addResult(resourceRecord);
+                recordSet.add(resourceRecord);
+            } else if (recordType == RecordType.MX) {
+                String mxName = parseName(response, answerIndex + 14);
+                resourceRecord = new ResourceRecord(hostName, recordType, ttl, mxName);
+                cache.addResult(resourceRecord);
+                recordSet.add(resourceRecord);
+            } else if (recordType == RecordType.AAAA){
+                InetAddress ip = getIpv6Address(response, answerIndex);
+                resourceRecord = new ResourceRecord(hostName, recordType, ttl, ip);
+                cache.addResult(resourceRecord);
+                recordSet.add(resourceRecord);
+            } else if (recordType == RecordType.A) {
+                InetAddress ip = getIpv4Address(response, answerIndex);
+                resourceRecord = new ResourceRecord(hostName, recordType, ttl, ip);
+                cache.addResult(resourceRecord);
+                recordSet.add(resourceRecord);
+            }
+
+            // advance index to next answer
+            answerIndex += dataLength + 12;
+        }
+
         return recordSet;
     }
 
-    private static int getAdditionalRecords(byte[] response) {
-        byte[] additionalRecords = new byte[2];
-        additionalRecords[0] = response[10];
-        additionalRecords[1] = response[11];
-        return ByteBuffer.wrap(additionalRecords).getShort();
+    private static int getNumberOfRecords(byte[] response) {
+        int records = 0;
+        for (int i = 6; i < 12; i+=2) {
+            byte[] bytes = new byte[] {response[i], response[i+1]};
+            records += ByteBuffer.wrap(bytes).getShort();
+        }
+        return records;
+    }
+
+    private static String getHostName(byte[] response, int answerIndex) {
+        byte bitmask = 0b00111111;
+        byte[] nameLocation = new byte[] {(byte) (bitmask & response[answerIndex]), response[answerIndex + 1]};
+        int hostIndex = ByteBuffer.wrap(nameLocation).getShort();
+        return parseName(response, hostIndex);
+    }
+
+    private static RecordType getResponseType(byte[] response, int answerIndex) {
+        byte[] type = new byte[] {response[answerIndex + 2], response[answerIndex + 3]};
+        return RecordType.getByCode(ByteBuffer.wrap(type).getShort());
+    }
+
+    private static int getDataLength(byte[] response, int answerIndex) {
+        byte[] length = new byte[] {response[answerIndex + 10], response[answerIndex + 11]};
+        return ByteBuffer.wrap(length).getShort();
+    }
+
+    private static InetAddress getIpv4Address(byte[] response, int answerIndex) throws UnknownHostException {
+        byte[] ipBytes = new byte[4];
+        System.arraycopy(response, answerIndex + 12, ipBytes, 0, 4);
+        return InetAddress.getByAddress(ipBytes);
+    }
+
+    private static InetAddress getIpv6Address(byte[] response, int answerIndex) throws UnknownHostException {
+        byte[] ipBytes = new byte[16];
+        System.arraycopy(response, answerIndex + 12, ipBytes, 0, 16);
+        return InetAddress.getByAddress(ipBytes);
     }
 
     private static int getQDCount(byte[] response) {
@@ -206,7 +252,10 @@ public class DNSQueryHandler {
         return qIndex;
     }
 
-    private static DNSNode getQueryDnsNode(byte[] response, int nameIndex) {
+    private static String parseName(byte[] response, int nameIndex) {
+        if (response[nameIndex] == (byte) 0xc0) {
+            return getHostName(response, nameIndex);
+        }
         byte[] nameBytes = new byte[512];
         int sectionSize = response[nameIndex];
         int nameByteIndex = 0;
@@ -216,13 +265,14 @@ public class DNSQueryHandler {
                 nameBytes[nameByteIndex++] = response[responseIndex++];
             }
             nameBytes[nameByteIndex++] = 0x2e;
-            sectionSize = response[responseIndex++];
+            sectionSize = 0x000000FF & response[responseIndex++];
+            if (sectionSize == 0xc0) {
+                byte[] trimmedBytes = Arrays.copyOfRange(nameBytes, 0, nameByteIndex);
+                return (new String(trimmedBytes, StandardCharsets.UTF_8)) + getHostName(response, responseIndex - 1);
+            }
         }
-        String queryString = new String(nameBytes, StandardCharsets.UTF_8);
-
-        byte[] typeBytes = new byte[] { response[responseIndex++], response[responseIndex] };
-        int type = ByteBuffer.wrap(typeBytes).getShort();
-        return new DNSNode(queryString, RecordType.getByCode(type));
+        nameBytes[nameByteIndex - 1] = 0;
+        return (new String(nameBytes, StandardCharsets.UTF_8)).trim();
     }
 
     private static long getTTL(byte[] response, int answerIndex) {
