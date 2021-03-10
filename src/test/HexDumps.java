@@ -192,4 +192,8 @@ public class HexDumps {
         ));
     }
 
+    public static String EXPECTED_SIMPLE_QUERY_CS_UBC_CA =
+            "001b0000000100000000000003777777" +
+            "026373037562630263610000010001";
+
 }

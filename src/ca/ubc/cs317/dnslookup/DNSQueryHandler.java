@@ -9,6 +9,8 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
+import static test.HexDumps.EXPECTED_SIMPLE_QUERY_CS_UBC_CA;
+
 public class DNSQueryHandler {
 
     private static final int DEFAULT_DNS_PORT = 53;
@@ -60,7 +62,7 @@ public class DNSQueryHandler {
         DatagramPacket queryPacket = new DatagramPacket(query, query.length, server, DEFAULT_DNS_PORT);
         DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
 
-        socket = new DatagramSocket();
+        openSocket();
         socket.send(queryPacket);
         socket.receive(responsePacket);
 
@@ -70,6 +72,16 @@ public class DNSQueryHandler {
         responseId[1] = responseData[1];
 
         return new DNSServerResponse(ByteBuffer.wrap(responseData), ByteBuffer.wrap(responseId).getShort());
+    }
+
+    private static ByteBuffer byteBufferFromHexString(String packet) {
+        int length = packet.length();
+        byte[] data = new byte[length / 2];
+        for (int i = 0; i < length; i += 2) {
+            data[i / 2] = (byte) (((Character.digit(packet.charAt(i), 16) << 4)) +
+                    Character.digit(packet.charAt(i + 1), 16));
+        }
+        return ByteBuffer.wrap(data);
     }
 
     private static void addHeader(byte[] message) {
@@ -86,11 +98,14 @@ public class DNSQueryHandler {
         message[4] = 0x00;
         message[5] = 0x01;
         // number of answer PRs
+        message[6] = 0x00;
+        message[7] = 0x00;
         // number of authority PRs
+        message[8] = 0x00;
+        message[9] = 0x00;
         // number of additional PRs
-        for (int i = 6; i < 12; i++) {
-            message[i] = 0x00;
-        }
+        message[10] = 0x00;
+        message[11] = 0x00;
     }
 
     private static byte[] newQueryWithQuestion(byte[] message, DNSNode dnsNode) {
