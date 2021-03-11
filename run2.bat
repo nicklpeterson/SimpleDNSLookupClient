@@ -1,1 +1,1 @@
-java -jar DNSLookupService.jar 8.8.8.8 -p1
+java -jar DNSLookupService.jar 199.7.83.42

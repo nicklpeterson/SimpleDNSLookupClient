@@ -4,12 +4,7 @@ import java.io.IOException;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Random;
-import java.util.Set;
-
-import static test.HexDumps.EXPECTED_SIMPLE_QUERY_CS_UBC_CA;
+import java.util.*;
 
 public class DNSQueryHandler {
 
@@ -55,7 +50,8 @@ public class DNSQueryHandler {
                                                       DNSNode node) throws IOException {
         //TODO: add verbose logging
         // TODO: add timeout if no response received. Retry the request 10 times.
-        addHeader(message);
+        int id = addHeader(message);
+        verbosePrintQuery(node, id, server);
         byte[] query = newQueryWithQuestion(message, node);
 
         byte[] buffer = new byte[65508];
@@ -74,17 +70,7 @@ public class DNSQueryHandler {
         return new DNSServerResponse(ByteBuffer.wrap(responseData), ByteBuffer.wrap(responseId).getShort());
     }
 
-    private static ByteBuffer byteBufferFromHexString(String packet) {
-        int length = packet.length();
-        byte[] data = new byte[length / 2];
-        for (int i = 0; i < length; i += 2) {
-            data[i / 2] = (byte) (((Character.digit(packet.charAt(i), 16) << 4)) +
-                    Character.digit(packet.charAt(i + 1), 16));
-        }
-        return ByteBuffer.wrap(data);
-    }
-
-    private static void addHeader(byte[] message) {
+    private static int addHeader(byte[] message) {
         final Random random = new Random();
         final byte[] id = new byte[2];
         random.nextBytes(id);
@@ -92,7 +78,7 @@ public class DNSQueryHandler {
         message[0] = id[0];
         message[1] = id[1];
         // flags
-        message[2] = 0x01;
+        message[2] = 0x00;
         message[3] = 0x00;
         // number of questions
         message[4] = 0x00;
@@ -106,12 +92,13 @@ public class DNSQueryHandler {
         // number of additional PRs
         message[10] = 0x00;
         message[11] = 0x00;
+        return 0xffff & ByteBuffer.wrap(id).getShort();
     }
 
     private static byte[] newQueryWithQuestion(byte[] message, DNSNode dnsNode) {
         final byte[] name = dnsNode.getHostName().getBytes();
         byte initialByte = 0;
-        for (int i = 0; name[i] != 0x2e; i++) {
+        for (int i = 0; i < name.length && name[i] != 0x2e; i++) {
             initialByte++;
         }
         int msgIndex = 12;
@@ -167,48 +154,78 @@ public class DNSQueryHandler {
                                                              DNSCache cache) throws UnknownHostException {
         // TODO (PART 1): Implement this
         byte[] response = responseBuffer.array();
-        int numberOfRecords = getNumberOfRecords(response);
+        int replyCode = getReplyCode(response);
+        boolean isAuthoritative = isAuthoritative(response);
+        if (replyCode == 2) {
+            return null;
+        }
+        int numAnswers = getNumAnswers(response);
+        int numAuthority = getNumAuthority(response);
+        int numAdditional = getNumAdditional(response);
+        int numberOfRecords = numAnswers + numAdditional + numAuthority;
         int answerIndex = getAnswerIndex(response);
+
+        // TODO: Add the appropriate resource records and verbose print
+
+        List<ResourceRecord> additional = new ArrayList<>();
+        List<ResourceRecord> nameservers = new ArrayList<>();
+        List<ResourceRecord> answers = new ArrayList<>();
 
         // Get Query DNSNode
         // DNSNode dnsNode = getQueryDnsNode(response, nameIndex);
         Set<ResourceRecord> recordSet = new HashSet<>();
         for (int i = 0; i < numberOfRecords; i++) {
 
-            String hostName = getHostName(response, answerIndex);
+            String hostName = parseName(response, answerIndex);
             RecordType recordType = getResponseType(response, answerIndex);
             long ttl = getTTL(response, answerIndex);
             int dataLength = getDataLength(response, answerIndex);
 
             // If record type is other skip the record. TODO: Make sure that is correct
-            ResourceRecord resourceRecord;
+            ResourceRecord resourceRecord = null;
             if (recordType == RecordType.CNAME || recordType == RecordType.NS || recordType == RecordType.SOA) {
-                String cname = parseName(response, answerIndex + 12);
-                resourceRecord = new ResourceRecord(hostName, recordType, ttl, cname);
+                String name = parseName(response, answerIndex + 12);
+                resourceRecord = new ResourceRecord(hostName, recordType, ttl, name);
                 cache.addResult(resourceRecord);
-                recordSet.add(resourceRecord);
+                if (recordType == RecordType.NS) {
+                    recordSet.add(resourceRecord);
+                }
             } else if (recordType == RecordType.MX) {
                 String mxName = parseName(response, answerIndex + 14);
                 resourceRecord = new ResourceRecord(hostName, recordType, ttl, mxName);
                 cache.addResult(resourceRecord);
-                recordSet.add(resourceRecord);
             } else if (recordType == RecordType.AAAA){
                 InetAddress ip = getIpv6Address(response, answerIndex);
                 resourceRecord = new ResourceRecord(hostName, recordType, ttl, ip);
                 cache.addResult(resourceRecord);
-                recordSet.add(resourceRecord);
             } else if (recordType == RecordType.A) {
                 InetAddress ip = getIpv4Address(response, answerIndex);
                 resourceRecord = new ResourceRecord(hostName, recordType, ttl, ip);
                 cache.addResult(resourceRecord);
-                recordSet.add(resourceRecord);
             }
 
+            if (i < numAnswers) {
+                answers.add(resourceRecord);
+            } else if (i < numAnswers + numAuthority) {
+                nameservers.add(resourceRecord);
+            } else {
+                additional.add(resourceRecord);
+            }
             // advance index to next answer
             answerIndex += dataLength + 12;
         }
+        verbosePrintResponse(0xFFFF & transactionID, isAuthoritative, answers, nameservers, additional);
 
         return recordSet;
+    }
+
+    private static int getReplyCode(byte[] response) {
+        byte[] code = new byte[]{response[2], response[3]};
+        return 0b0000000000001111 & ByteBuffer.wrap(code).getShort();
+    }
+
+    private static boolean isAuthoritative(byte[] response) {
+        return (0b00000100 & response[2]) == 0b00000100;
     }
 
     private static int getNumberOfRecords(byte[] response) {
@@ -220,9 +237,24 @@ public class DNSQueryHandler {
         return records;
     }
 
+    private static int getNumAnswers(byte[] response) {
+        byte[] bytes = new byte[] {response[6], response[7] };
+        return ByteBuffer.wrap(bytes).getShort();
+    }
+
+    private static int getNumAuthority(byte[] response) {
+        byte[] bytes = new byte[] {response[8], response[9]};
+        return ByteBuffer.wrap(bytes).getShort();
+    }
+
+    private static int getNumAdditional(byte[] response) {
+        byte[] bytes = new byte[] {response[10], response[11]};
+        return ByteBuffer.wrap(bytes).getShort();
+    }
+
     private static String getHostName(byte[] response, int answerIndex) {
         byte bitmask = 0b00111111;
-        byte[] nameLocation = new byte[] {(byte) (bitmask & response[answerIndex]), response[answerIndex + 1]};
+        byte[] nameLocation = new byte[]{(byte) (bitmask & response[answerIndex]), response[answerIndex + 1]};
         int hostIndex = ByteBuffer.wrap(nameLocation).getShort();
         return parseName(response, hostIndex);
     }
@@ -319,11 +351,41 @@ public class DNSQueryHandler {
      * @param rtype  The type of the record to be printed
      */
     private static void verbosePrintResourceRecord(ResourceRecord record, int rtype) {
-        if (verboseTracing)
+        if (verboseTracing) {
             System.out.format("       %-30s %-10d %-4s %s\n", record.getHostName(),
                     record.getTTL(),
                     record.getType() == RecordType.OTHER ? rtype : record.getType(),
                     record.getTextResult());
+            System.out.flush();
+        }
     }
+
+    private static void verbosePrintQuery(DNSNode node, int id, InetAddress server) {
+        if (verboseTracing) {
+            System.out.format("Query ID     %d %s  %s --> %s\n",
+                    id, node.getHostName(), node.getType(), server.getHostAddress());
+            System.out.flush();
+        }
+    }
+
+    private static void verbosePrintResponse(int id, boolean auth, List<ResourceRecord> answers,
+                                             List<ResourceRecord> nameServers, List<ResourceRecord> add) {
+        if (verboseTracing) {
+            System.out.format("Response ID:  %d Authoritative = %b\n", id, auth);
+            System.out.format("Answers(%d)\n", answers.size());
+            for (ResourceRecord resourceRecord : answers) {
+                verbosePrintResourceRecord(resourceRecord, resourceRecord.getType().getCode());
+            }
+            System.out.format("Nameservers(%d)\n", nameServers.size());
+            for (ResourceRecord resourceRecord : nameServers) {
+                verbosePrintResourceRecord(resourceRecord, resourceRecord.getType().getCode());
+            }
+            System.out.format("Additional Information(%d)\n", add.size());
+            for (ResourceRecord resourceRecord : add) {
+                verbosePrintResourceRecord(resourceRecord, resourceRecord.getType().getCode());
+            }
+        }
+    }
+
 }
 

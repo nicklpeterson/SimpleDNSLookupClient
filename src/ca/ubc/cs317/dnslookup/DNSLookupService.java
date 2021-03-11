@@ -174,9 +174,23 @@ public class DNSLookupService {
 
         // TODO (PART 1/2): Implement this
 
+        // 1. Check if there is a record of the proper type corresponding to the node. If so, we are done.
+        if (!cache.getCachedResults(node).isEmpty()) {
+            return cache.getCachedResults(node);
+        }
 
+        // 2. Check if there is a CNAME record that corresponds to the Node
+        // If there is recursively search for it
+        Set<ResourceRecord> cnameRecords = cache.getCachedResults(new DNSNode(node.getHostName(), RecordType.CNAME));
+        for (ResourceRecord cnameRecord : cnameRecords) {
+            return getResults(new DNSNode(cnameRecord.getTextResult(), node.getType()), indirectionLevel + 1);
+        }
 
-        return cache.getCachedResults(node);
+        retrieveResultsFromServer(node, rootServer);
+        return getResults(node, 0);
+
+        // 3. Select a potential nameserver and if its address is in the additional information or the cache,
+        // repeat the query to this new nameserver
     }
 
     /**
@@ -202,7 +216,9 @@ public class DNSLookupService {
 
             queryNextLevel(node, nameservers);
 
-        } catch (IOException | NullPointerException ignored){}
+        } catch (IOException | NullPointerException e){
+            System.out.println(e.getMessage());
+        }
     }
 
     /**
@@ -213,6 +229,32 @@ public class DNSLookupService {
      */
     private static void queryNextLevel(DNSNode node, Set<ResourceRecord> nameservers) {
         // TODO (PART 2): Implement this
+        // If we have already cached the ip address don't query the next level
+        if (!cache.getCachedResults(node).isEmpty()) {
+            return;
+        }
+
+        // If any of the name server ips have been cached send the next query to that ip
+        for (ResourceRecord nameserver : nameservers) {
+            Set<ResourceRecord> nameServerIpRecords = cache.getCachedResults(new DNSNode(nameserver.getTextResult(), RecordType.A));
+            if (!nameServerIpRecords.isEmpty()) {
+                retrieveResultsFromServer(node, nameServerIpRecords.iterator().next().getInetResult());
+                return;
+            }
+        }
+
+        // If an ip is not in the cache, query the root server for the ip
+        for (ResourceRecord nameserver : nameservers) {
+            DNSNode targetNode = new DNSNode(nameserver.getTextResult(), RecordType.A);
+            getResults(targetNode, 0);
+            Set<ResourceRecord> nameServerIpRecords = cache.getCachedResults(new DNSNode(nameserver.getTextResult(), RecordType.A));
+            if (!nameServerIpRecords.isEmpty()) {
+                retrieveResultsFromServer(node, nameServerIpRecords.iterator().next().getInetResult());
+                return;
+            }
+        }
+
+        // TODO: Handle case where we cannot find name server ip
 
     }
 
