@@ -274,13 +274,13 @@ public class DNSQueryHandler {
 
     private static InetAddress getIpv4Address(byte[] response, int answerIndex) throws UnknownHostException {
         byte[] ipBytes = new byte[4];
-        System.arraycopy(response, answerIndex + 12, ipBytes, 0, 4);
+        System.arraycopy(response, answerIndex + 10, ipBytes, 0, 4);
         return InetAddress.getByAddress(ipBytes);
     }
 
     private static InetAddress getIpv6Address(byte[] response, int answerIndex) throws UnknownHostException {
         byte[] ipBytes = new byte[16];
-        System.arraycopy(response, answerIndex + 12, ipBytes, 0, 16);
+        System.arraycopy(response, answerIndex + 10, ipBytes, 0, 16);
         return InetAddress.getByAddress(ipBytes);
     }
 

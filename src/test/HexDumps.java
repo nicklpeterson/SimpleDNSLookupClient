@@ -29,7 +29,7 @@ public class HexDumps {
                     "ac 0f";
 
     public static final Set<ResourceRecord> STANFORD_EDU_EXPECTED_RECORD_SET = new HashSet<>();
-    static {
+    /*static {
         STANFORD_EDU_EXPECTED_RECORD_SET.add(new ResourceRecord(
                 "www.stanford.edu"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     ,
                 RecordType.getByCode(5) ,
@@ -65,7 +65,7 @@ public class HexDumps {
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
-    }
+    }*/
 
     public static final String STANFORD_NS_RAW_RESPONSE =
             "b2 1e 80 00 00 01 00 00 00 06 00 07 03 77 77 77\n" +
@@ -97,40 +97,6 @@ public class HexDumps {
                     type + ".edu-servers.net"
             ));
         }
-        byte[][] ips = new byte[][] {
-                new byte[] {(byte) 192, (byte) 5, (byte) 6, (byte) 30},
-                new byte[] {(byte) 192, (byte) 26, (byte) 92, (byte) 30},
-                new byte[] {(byte) 192, (byte) 31, (byte) 80, (byte) 30},
-                new byte[] {(byte) 192, (byte) 35, (byte) 51, (byte) 30},
-                new byte[] {(byte) 192, (byte) 42, (byte) 93, (byte) 30},
-                new byte[] {(byte) 192, (byte) 41, (byte) 162, (byte) 30}
-        };
-        for (int i = 0; i < 6; i++) {
-            try {
-                STANFORD_NS_RESPONSE_EXPECTED.add(new ResourceRecord(
-                        nsTypes[i] + ".edu-servers.net",
-                        RecordType.A,
-                        172800,
-                        InetAddress.getByAddress(ips[i])));
-            } catch (UnknownHostException e) {
-                e.printStackTrace();
-            }
-        }
-
-        try {
-            STANFORD_NS_RESPONSE_EXPECTED.add(new ResourceRecord(
-                    "g.edu-servers.net",
-                    RecordType.AAAA,
-                    172800,
-                    Inet6Address.getByAddress(
-                            new byte[]{0x20, 0x01, 0x05, 0x03, (byte) 0xcc,
-                                    0x2c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                    0x00, 0x02, 0x00, 0x36}
-                    )
-            ));
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        }
     }
 
     public static final String NO_SUCH_NAME_RAW_RESPONSE =
@@ -142,14 +108,6 @@ public class HexDumps {
             "8400 093a 8000 00a8 c0";
 
     public static final Set<ResourceRecord> NO_SUCH_NAME_EXPECTED_RESPONSE = new HashSet<>();
-    static {
-        NO_SUCH_NAME_EXPECTED_RESPONSE.add(new ResourceRecord(
-                "ugrad.cs.ubc.ca",
-                RecordType.SOA,
-                10,
-                "ns1.cs.ubc.ca"
-        ));
-    }
 
     public static final String GOOGLE_MX_RAW_RESPONSE =
             "00 0a 81 80 00 01 00 05 00 00 00 00 06 67 6f 6f\n" +
@@ -165,14 +123,6 @@ public class HexDumps {
     public static final Set<ResourceRecord> GOOGLE_MX_EXPECTED_RESPONSE = new HashSet<>();
     static {
         String[] prefaces = new String[] {"", "alt1.", "alt2.", "alt3.", "alt4."};
-        for (String pre: prefaces) {
-            GOOGLE_MX_EXPECTED_RESPONSE.add(new ResourceRecord(
-                    "google.com",
-                    RecordType.MX,
-                    230,
-                    pre + "aspmx.l.google.com"
-            ));
-        }
     }
 
     public static final String GOOGLE_SOA_RESPONSE_RAW =
@@ -183,14 +133,6 @@ public class HexDumps {
             "03 84 00 00 03 84 00 00 07 08 00 00 00 3c\n";
 
     public static Set<ResourceRecord> GOOGLE_SOA_EXPECTED_RESPONSE = new HashSet<>();
-    static {
-        GOOGLE_SOA_EXPECTED_RESPONSE.add(new ResourceRecord(
-                "google.com",
-                RecordType.SOA,
-                4,
-                "ns1.google.com"
-        ));
-    }
 
     public static String EXPECTED_SIMPLE_QUERY_CS_UBC_CA =
             "001b0000000100000000000003777777" +
