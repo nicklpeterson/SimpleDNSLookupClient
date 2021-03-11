@@ -177,6 +177,9 @@ public class DNSQueryHandler {
         for (int i = 0; i < numberOfRecords; i++) {
 
             String hostName = parseName(response, answerIndex);
+            while (response[answerIndex] != 0) {
+                answerIndex++;
+            }
             RecordType recordType = getResponseType(response, answerIndex);
             long ttl = getTTL(response, answerIndex);
             int dataLength = getDataLength(response, answerIndex);
@@ -184,14 +187,14 @@ public class DNSQueryHandler {
             // If record type is other skip the record. TODO: Make sure that is correct
             ResourceRecord resourceRecord = null;
             if (recordType == RecordType.CNAME || recordType == RecordType.NS || recordType == RecordType.SOA) {
-                String name = parseName(response, answerIndex + 12);
+                String name = parseName(response, answerIndex + 10);
                 resourceRecord = new ResourceRecord(hostName, recordType, ttl, name);
                 cache.addResult(resourceRecord);
                 if (recordType == RecordType.NS) {
                     recordSet.add(resourceRecord);
                 }
             } else if (recordType == RecordType.MX) {
-                String mxName = parseName(response, answerIndex + 14);
+                String mxName = parseName(response, answerIndex + 12);
                 resourceRecord = new ResourceRecord(hostName, recordType, ttl, mxName);
                 cache.addResult(resourceRecord);
             } else if (recordType == RecordType.AAAA){
@@ -212,7 +215,7 @@ public class DNSQueryHandler {
                 additional.add(resourceRecord);
             }
             // advance index to next answer
-            answerIndex += dataLength + 12;
+            answerIndex += dataLength + 10;
         }
         verbosePrintResponse(0xFFFF & transactionID, isAuthoritative, answers, nameservers, additional);
 
@@ -260,12 +263,12 @@ public class DNSQueryHandler {
     }
 
     private static RecordType getResponseType(byte[] response, int answerIndex) {
-        byte[] type = new byte[] {response[answerIndex + 2], response[answerIndex + 3]};
+        byte[] type = new byte[] {response[answerIndex], response[answerIndex + 1]};
         return RecordType.getByCode(ByteBuffer.wrap(type).getShort());
     }
 
     private static int getDataLength(byte[] response, int answerIndex) {
-        byte[] length = new byte[] {response[answerIndex + 10], response[answerIndex + 11]};
+        byte[] length = new byte[] {response[answerIndex + 8], response[answerIndex + 9]};
         return ByteBuffer.wrap(length).getShort();
     }
 
@@ -324,7 +327,7 @@ public class DNSQueryHandler {
 
     private static long getTTL(byte[] response, int answerIndex) {
         byte[] ttlBytes = new byte[4];
-        for (int i = answerIndex + 6, k = 0; i < answerIndex + 10; i++, k++) {
+        for (int i = answerIndex + 4, k = 0; i < answerIndex + 8; i++, k++) {
             ttlBytes[k] = response[i];
         }
         return ByteBuffer.wrap(ttlBytes).getInt();
