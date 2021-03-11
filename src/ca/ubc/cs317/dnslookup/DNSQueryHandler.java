@@ -178,9 +178,11 @@ public class DNSQueryHandler {
         // DNSNode dnsNode = getQueryDnsNode(response, nameIndex);
         Set<ResourceRecord> recordSet = new HashSet<>();
         for (int i = 0; i < numberOfRecords; i++) {
-
             String hostName = parseName(response, answerIndex);
             while (response[answerIndex] != 0) {
+                answerIndex++;
+            }
+            if (response[answerIndex + 2] != 0 || response[answerIndex + 3] != 1) {
                 answerIndex++;
             }
             RecordType recordType = getResponseType(response, answerIndex);
@@ -310,9 +312,6 @@ public class DNSQueryHandler {
     }
 
     private static String parseName(byte[] response, int nameIndex) throws IOException {
-        if (nameIndex < 0 || nameIndex >= response.length) {
-            throw new IOException("Response timed out");
-        }
         if (response[nameIndex] == (byte) 0xc0) {
             return getHostName(response, nameIndex);
         }
