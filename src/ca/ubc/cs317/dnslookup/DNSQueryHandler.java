@@ -151,7 +151,7 @@ public class DNSQueryHandler {
      * @return A set of resource records corresponding to the name servers of the response.
      */
     public static Set<ResourceRecord> decodeAndCacheResponse(int transactionID, ByteBuffer responseBuffer,
-                                                             DNSCache cache) throws UnknownHostException, DNSParsingException {
+                                                             DNSCache cache) throws IOException, DNSParsingException {
         // TODO (PART 1): Implement this
         byte[] response = responseBuffer.array();
         int replyCode = getReplyCode(response);
@@ -262,7 +262,7 @@ public class DNSQueryHandler {
         return ByteBuffer.wrap(bytes).getShort();
     }
 
-    private static String getHostName(byte[] response, int answerIndex) {
+    private static String getHostName(byte[] response, int answerIndex) throws IOException {
         byte bitmask = 0b00111111;
         byte[] nameLocation = new byte[]{(byte) (bitmask & response[answerIndex]), response[answerIndex + 1]};
         int hostIndex = ByteBuffer.wrap(nameLocation).getShort();
@@ -309,7 +309,10 @@ public class DNSQueryHandler {
         return qIndex;
     }
 
-    private static String parseName(byte[] response, int nameIndex) {
+    private static String parseName(byte[] response, int nameIndex) throws IOException {
+        if (nameIndex < 0 || nameIndex >= response.length) {
+            throw new IOException("Response timed out");
+        }
         if (response[nameIndex] == (byte) 0xc0) {
             return getHostName(response, nameIndex);
         }
