@@ -1,6 +1,7 @@
 package test;
 
 import ca.ubc.cs317.dnslookup.DNSCache;
+import ca.ubc.cs317.dnslookup.DNSParsingException;
 import ca.ubc.cs317.dnslookup.DNSQueryHandler;
 import ca.ubc.cs317.dnslookup.ResourceRecord;
 import org.junit.Before;
@@ -31,7 +32,7 @@ public class DNSQueryHandlerTests {
                     byteBufferFromHexString(STANFORD_EDU_RAW_RESPONSE.replaceAll("\\s+", "")),
                     emptyCache);
             assertEquals(STANFORD_EDU_EXPECTED_RECORD_SET, resourceRecordSet);
-        } catch (UnknownHostException e) {
+        } catch (UnknownHostException | DNSParsingException e) {
             fail(e.getMessage());
         }
     }
@@ -46,7 +47,7 @@ public class DNSQueryHandlerTests {
                     byteBufferFromHexString(STANFORD_NS_RAW_RESPONSE.replaceAll("\\s+", "")),
                     emptyCache);
             assertEquals(STANFORD_NS_RESPONSE_EXPECTED, resourceRecordSet);
-        } catch (UnknownHostException e) {
+        } catch (UnknownHostException | DNSParsingException e) {
             fail(e.getMessage());
         }
     }
@@ -62,7 +63,7 @@ public class DNSQueryHandlerTests {
                     emptyCache
             );
             assertEquals(GOOGLE_MX_EXPECTED_RESPONSE, resourceRecordSet);
-        } catch (UnknownHostException e) {
+        } catch (UnknownHostException | DNSParsingException e) {
             fail(e.getMessage());
         }
     }
@@ -76,7 +77,7 @@ public class DNSQueryHandlerTests {
                     emptyCache
             );
             assertEquals(GOOGLE_SOA_EXPECTED_RESPONSE, resourceRecordSet);
-        } catch (UnknownHostException e) {
+        } catch (UnknownHostException | DNSParsingException e) {
             fail(e.getMessage());
         }
     }
@@ -90,7 +91,7 @@ public class DNSQueryHandlerTests {
                     emptyCache
             );
             assertEquals(NO_SUCH_NAME_EXPECTED_RESPONSE, resourceRecordSet);
-        } catch (UnknownHostException e) {
+        } catch (UnknownHostException | DNSParsingException e) {
             fail(e.getMessage());
         }
     }

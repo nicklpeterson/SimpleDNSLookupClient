@@ -163,30 +163,38 @@ public class DNSLookupService {
      * @return A set of resource records corresponding to the specific query requested.
      */
     private static Set<ResourceRecord> getResults(DNSNode node, int indirectionLevel) {
+        try {
 
-        if (p1Flag) { // For isolating part 1 testing only
+            if (p1Flag) { // For isolating part 1 testing only
+                retrieveResultsFromServer(node, rootServer);
+                return Collections.emptySet();
+            } else if (indirectionLevel > MAX_INDIRECTION_LEVEL) {
+                System.err.println("Maximum number of indirection levels reached.");
+                return Collections.emptySet();
+            }
+
+            // TODO (PART 1/2): Implement this
+
+            // 1. Check if there is a record of the proper type corresponding to the node. If so, we are done.
+            if (!cache.getCachedResults(node).isEmpty()) {
+                return cache.getCachedResults(node);
+            }
+
+            // 2. Check if there is a CNAME record that corresponds to the Node
+            // If there is recursively search for it
+            Set<ResourceRecord> cnameRecords = cache.getCachedResults(new DNSNode(node.getHostName(), RecordType.CNAME));
+            for (ResourceRecord cnameRecord : cnameRecords) {
+                return getResults(new DNSNode(cnameRecord.getTextResult(), node.getType()), indirectionLevel + 1);
+            }
             retrieveResultsFromServer(node, rootServer);
+
+        } catch (IOException e) {
+            System.out.println(e.getMessage());
             return Collections.emptySet();
-        } else if (indirectionLevel > MAX_INDIRECTION_LEVEL) {
-            System.err.println("Maximum number of indirection levels reached.");
+        } catch (DNSParsingException e) {
+            System.out.println(e.getMessage());
             return Collections.emptySet();
         }
-
-        // TODO (PART 1/2): Implement this
-
-        // 1. Check if there is a record of the proper type corresponding to the node. If so, we are done.
-        if (!cache.getCachedResults(node).isEmpty()) {
-            return cache.getCachedResults(node);
-        }
-
-        // 2. Check if there is a CNAME record that corresponds to the Node
-        // If there is recursively search for it
-        Set<ResourceRecord> cnameRecords = cache.getCachedResults(new DNSNode(node.getHostName(), RecordType.CNAME));
-        for (ResourceRecord cnameRecord : cnameRecords) {
-            return getResults(new DNSNode(cnameRecord.getTextResult(), node.getType()), indirectionLevel + 1);
-        }
-
-        retrieveResultsFromServer(node, rootServer);
         return getResults(node, 0);
 
         // 3. Select a potential nameserver and if its address is in the additional information or the cache,
@@ -201,24 +209,18 @@ public class DNSLookupService {
      * @param node   Host name and record type to be used for the query.
      * @param server Address of the server to be used for the query.
      */
-    private static void retrieveResultsFromServer(DNSNode node, InetAddress server) {
+    private static void retrieveResultsFromServer(DNSNode node, InetAddress server) throws IOException, DNSParsingException {
         byte[] message = new byte[512]; // query is no longer than 512 bytes
+        DNSServerResponse serverResponse = DNSQueryHandler.buildAndSendQuery(message, server, node);
 
-        try {
-            DNSServerResponse serverResponse = DNSQueryHandler.buildAndSendQuery(message, server, node);
+        Set<ResourceRecord> nameservers = DNSQueryHandler.decodeAndCacheResponse(serverResponse.getTransactionID(),
+                serverResponse.getResponse(),
+                cache);
+        if (nameservers == null) nameservers = Collections.emptySet();
 
-            Set<ResourceRecord> nameservers = DNSQueryHandler.decodeAndCacheResponse(serverResponse.getTransactionID(),
-                    serverResponse.getResponse(),
-                    cache);
-            if (nameservers == null) nameservers = Collections.emptySet();
+        if (p1Flag) return; // For testing part 1 only
 
-            if (p1Flag) return; // For testing part 1 only
-
-            queryNextLevel(node, nameservers);
-
-        } catch (IOException | NullPointerException e){
-            System.out.println(e.getMessage());
-        }
+        queryNextLevel(node, nameservers);
     }
 
     /**
@@ -227,7 +229,7 @@ public class DNSLookupService {
      * @param node        Host name and record type of the query.
      * @param nameservers List of name servers returned from the previous level to query the next level.
      */
-    private static void queryNextLevel(DNSNode node, Set<ResourceRecord> nameservers) {
+    private static void queryNextLevel(DNSNode node, Set<ResourceRecord> nameservers) throws IOException, DNSParsingException {
         // TODO (PART 2): Implement this
         // If we have already cached the ip address don't query the next level
         if (!cache.getCachedResults(node).isEmpty()) {

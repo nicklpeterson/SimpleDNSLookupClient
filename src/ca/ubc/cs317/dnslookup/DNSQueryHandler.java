@@ -151,18 +151,21 @@ public class DNSQueryHandler {
      * @return A set of resource records corresponding to the name servers of the response.
      */
     public static Set<ResourceRecord> decodeAndCacheResponse(int transactionID, ByteBuffer responseBuffer,
-                                                             DNSCache cache) throws UnknownHostException {
+                                                             DNSCache cache) throws UnknownHostException, DNSParsingException {
         // TODO (PART 1): Implement this
         byte[] response = responseBuffer.array();
         int replyCode = getReplyCode(response);
         boolean isAuthoritative = isAuthoritative(response);
-        if (replyCode == 2) {
-            return null;
+        if (replyCode != 0) {
+            throw new DNSParsingException("Response RCODE: " + replyCode);
         }
         int numAnswers = getNumAnswers(response);
         int numAuthority = getNumAuthority(response);
         int numAdditional = getNumAdditional(response);
         int numberOfRecords = numAnswers + numAdditional + numAuthority;
+        if (numberOfRecords == 0) {
+            throw new DNSParsingException("No answer in answer field");
+        }
         int answerIndex = getAnswerIndex(response);
 
         // TODO: Add the appropriate resource records and verbose print
@@ -374,7 +377,7 @@ public class DNSQueryHandler {
     private static void verbosePrintResponse(int id, boolean auth, List<ResourceRecord> answers,
                                              List<ResourceRecord> nameServers, List<ResourceRecord> add) {
         if (verboseTracing) {
-            System.out.format("Response ID:  %d Authoritative = %b\n", id, auth);
+            System.out.format("Response ID: %d Authoritative = %b\n", id, auth);
             System.out.format("Answers(%d)\n", answers.size());
             for (ResourceRecord resourceRecord : answers) {
                 verbosePrintResourceRecord(resourceRecord, resourceRecord.getType().getCode());
