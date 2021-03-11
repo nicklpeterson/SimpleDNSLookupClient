@@ -28,10 +28,10 @@ information to this file and then commit and push this file.
 
 
 STUDENT  1
-Name :
-St. No:
-cwl :
-Email:
+Name : Nick Peterson
+St. No: 28581643
+cwl : nipeters
+Email: npeterson270@gmail.com
 
 STUDENT  2
 Name :
