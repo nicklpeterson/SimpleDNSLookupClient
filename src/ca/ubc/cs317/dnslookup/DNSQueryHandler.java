@@ -164,7 +164,7 @@ public class DNSQueryHandler {
         int numAdditional = getNumAdditional(response);
         int numberOfRecords = numAnswers + numAdditional + numAuthority;
         if (numberOfRecords == 0) {
-            throw new DNSParsingException("No answer in answer field");
+            throw new DNSParsingException("No records in server response");
         }
         int answerIndex = getAnswerIndex(response);
 
@@ -221,6 +221,10 @@ public class DNSQueryHandler {
             answerIndex += dataLength + 10;
         }
         verbosePrintResponse(0xFFFF & transactionID, isAuthoritative, answers, nameservers, additional);
+
+        if (isAuthoritative && numAnswers == 0) {
+            throw new DNSParsingException("No answer found in authoritative in response");
+        }
 
         return recordSet;
     }
@@ -368,7 +372,7 @@ public class DNSQueryHandler {
 
     private static void verbosePrintQuery(DNSNode node, int id, InetAddress server) {
         if (verboseTracing) {
-            System.out.format("Query ID     %d %s  %s --> %s\n",
+            System.out.format("\n\nQuery ID     %d %s  %s --> %s\n",
                     id, node.getHostName(), node.getType(), server.getHostAddress());
             System.out.flush();
         }
@@ -378,15 +382,15 @@ public class DNSQueryHandler {
                                              List<ResourceRecord> nameServers, List<ResourceRecord> add) {
         if (verboseTracing) {
             System.out.format("Response ID: %d Authoritative = %b\n", id, auth);
-            System.out.format("Answers(%d)\n", answers.size());
+            System.out.format("  Answers(%d)\n", answers.size());
             for (ResourceRecord resourceRecord : answers) {
                 verbosePrintResourceRecord(resourceRecord, resourceRecord.getType().getCode());
             }
-            System.out.format("Nameservers(%d)\n", nameServers.size());
+            System.out.format("  Nameservers(%d)\n", nameServers.size());
             for (ResourceRecord resourceRecord : nameServers) {
                 verbosePrintResourceRecord(resourceRecord, resourceRecord.getType().getCode());
             }
-            System.out.format("Additional Information(%d)\n", add.size());
+            System.out.format("  Additional Information(%d)\n", add.size());
             for (ResourceRecord resourceRecord : add) {
                 verbosePrintResourceRecord(resourceRecord, resourceRecord.getType().getCode());
             }
