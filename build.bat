@@ -3,4 +3,4 @@ del sources.txt
 mkdir bin
 dir /s /B .\src\ca\*.java > sources.txt
 javac @sources.txt -d bin
-jar cvfe DNSLookupService.jar ca.ubc.cs317.dnslookup.DNSLookupService -C bin ca/
+jar cvfe DNSLookupService.jar ca.ubc.dnslookup.DNSLookupService -C bin ca/

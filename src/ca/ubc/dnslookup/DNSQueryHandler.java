@@ -1,4 +1,4 @@
-package ca.ubc.cs317.dnslookup;
+package ca.ubc.dnslookup;
 
 import java.io.IOException;
 import java.net.*;

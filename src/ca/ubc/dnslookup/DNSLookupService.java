@@ -1,4 +1,4 @@
-package ca.ubc.cs317.dnslookup;
+package ca.ubc.dnslookup;
 
 import java.io.Console;
 import java.io.IOException;
@@ -51,7 +51,7 @@ public class DNSLookupService {
             // Use console if one is available, or standard input if not.
             String commandLine;
             if (console != null) {
-                System.out.print("317LOOKUP> ");
+                System.out.print("LOOKUP> ");
                 commandLine = console.readLine();
             } else
                 try {
@@ -173,7 +173,6 @@ public class DNSLookupService {
                 return Collections.emptySet();
             }
 
-            // TODO (PART 1/2): Implement this
 
             // 1. Check if there is a record of the proper type corresponding to the node. If so, we are done.
             if (!cache.getCachedResults(node).isEmpty()) {
@@ -230,7 +229,6 @@ public class DNSLookupService {
      * @param nameservers List of name servers returned from the previous level to query the next level.
      */
     private static void queryNextLevel(DNSNode node, Set<ResourceRecord> nameservers) throws IOException, DNSParsingException {
-        // TODO (PART 2): Implement this
         // If we have already cached the ip address don't query the next level
         if (!cache.getCachedResults(node).isEmpty()) {
             return;

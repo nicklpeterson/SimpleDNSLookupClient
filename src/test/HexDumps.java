@@ -1,11 +1,8 @@
 package test;
 
-import ca.ubc.cs317.dnslookup.RecordType;
-import ca.ubc.cs317.dnslookup.ResourceRecord;
+import ca.ubc.dnslookup.RecordType;
+import ca.ubc.dnslookup.ResourceRecord;
 
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.util.HashSet;
 import java.util.Set;
 

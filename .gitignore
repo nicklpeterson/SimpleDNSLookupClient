@@ -66,3 +66,5 @@ __MACOSX/
 sources.txt
 .idea
 a2_nipeters.iml
+
+out/

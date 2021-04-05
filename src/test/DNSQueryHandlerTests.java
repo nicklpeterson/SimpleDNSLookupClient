@@ -1,13 +1,11 @@
 package test;
 
-import ca.ubc.cs317.dnslookup.DNSCache;
-import ca.ubc.cs317.dnslookup.DNSParsingException;
-import ca.ubc.cs317.dnslookup.DNSQueryHandler;
-import ca.ubc.cs317.dnslookup.ResourceRecord;
+import ca.ubc.dnslookup.DNSCache;
+import ca.ubc.dnslookup.DNSQueryHandler;
+import ca.ubc.dnslookup.ResourceRecord;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.Set;
 
