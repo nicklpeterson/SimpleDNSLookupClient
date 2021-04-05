@@ -1,6 +1,6 @@
 Simple DNS Server
 
-####Run
+##Run
 
 There is a compiled jar in this repository. Run with the following command:
 
@@ -8,7 +8,7 @@ There is a compiled jar in this repository. Run with the following command:
 Replace 198.162.35.1 with the ip address of any known DNS server. This will be the default DNS Server, it can be
  changed later when the program is running.
  
-####Compile
+##Compile
  
 If you want to make a fresh build. I use the following commands to compile the program:
 
@@ -17,7 +17,7 @@ If you want to make a fresh build. I use the following commands to compile the p
         jar cvfe DNSLookupService.jar ca.ubc.dnslookup.DNSLookupService -C bin ca/
         
 The build.bat file will execute these commands for you or you can build program however you like.
-####Usage
+##Usage
 
 Lookup the ip address for a given url address. Type is one of A, AAAA, NS, MX, or CNAME
 
