@@ -1,16 +1,8 @@
 Simple DNS Server
-
-## Run
-
-There is a compiled jar in this repository. Run with the following command:
-
-        java -jar DNSLookupService.jar 198.162.35.1
-Replace 198.162.35.1 with the ip address of any known DNS server. This will be the default DNS Server, it can be
- changed later when the program is running.
  
 ## Compile
  
-If you want to make a fresh build. I use the following commands to compile the program:
+I use the following commands to compile the program:
 
         dir /s /B .\src\ca\*.java > sources.txt
         javac @sources.txt -d bin
